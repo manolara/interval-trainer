@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instant Interval Trainer</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --accent: #38bdf8;
+            --answer-color: #4ade80;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 440px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 6px;
+            color: var(--accent);
+        }
+
+        .stats {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 2px solid #334155;
+            border-radius: 16px;
+            padding: 50px 20px;
+            min-height: 220px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+            transition: transform 0.08s ease, border-color 0.2s ease;
+            user-select: none;
+        }
+
+        .card:active {
+            transform: scale(0.97);
+        }
+
+        .prompt {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .timer {
+            font-size: 1.2rem;
+            font-family: monospace;
+            color: #64748b;
+            margin-bottom: 10px;
+            height: 1.5rem;
+        }
+
+        .answer {
+            font-size: 4rem;
+            font-weight: 900;
+            color: var(--answer-color);
+            margin-top: 5px;
+            display: none;
+        }
+
+        .flip-hint {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-top: 20px;
+            font-weight: 500;
+        }
+
+        .settings-btn {
+            margin-top: 25px;
+            background: none;
+            border: 1px solid #334155;
+            color: #94a3b8;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 12px;
+            max-width: 360px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            text-align: left;
+        }
+
+        .setting-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #334155;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        label { font-size: 0.95rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Rapid Interval Trainer</h1>
+    <div class="stats" id="stats">Session Reviews: 0 | Avg Speed: 0.00s</div>
+
+    <div class="card" id="card" onclick="handleCardClick()">
+        <div class="timer" id="timer">0.00s</div>
+        <div class="prompt" id="prompt">Δ7 of C</div>
+        <div class="answer" id="answer">B</div>
+        <div class="flip-hint" id="flipHint">Tap or [Space] to reveal</div>
+    </div>
+
+    <button class="settings-btn" onclick="toggleModal(true)">⚙️ Options & Filters</button>
+</div>
+
+<div class="modal" id="modal">
+    <div class="modal-content">
+        <h3 style="margin-top: 0;">Settings</h3>
+        
+        <div class="setting-toggle">
+            <span>Enable Timer</span>
+            <input type="checkbox" id="timerToggle" checked onchange="toggleTimerSetting(this.checked)" style="transform: scale(1.3); cursor: pointer;">
+        </div>
+
+        <h4 style="margin: 15px 0 5px 0; color: #94a3b8;">Intervals</h4>
+        <div class="checkbox-group" id="intervalFilters"></div>
+        <br>
+        <button class="settings-btn" style="width: 100%; background: var(--accent); color: #000; font-weight: bold;" onclick="toggleModal(false)">Save & Close</button>
+    </div>
+</div>
+
+<script>
+const INTERVAL_MAP = [
+    { label: "b2", semitones: 1, letterSteps: 1 },
+    { label: "2", semitones: 2, letterSteps: 1 },
+    { label: "b3", semitones: 3, letterSteps: 2 },
+    { label: "3", semitones: 4, letterSteps: 2 },
+    { label: "4", semitones: 5, letterSteps: 3 },
+    { label: "#4", semitones: 6, letterSteps: 3, tritone: true },
+    { label: "tritone", semitones: 6, letterSteps: 3, tritone: true },
+    { label: "5", semitones: 7, letterSteps: 4 },
+    { label: "b6", semitones: 8, letterSteps: 5 },
+    { label: "6", semitones: 9, letterSteps: 5 },
+    { label: "b7", semitones: 10, letterSteps: 6 },
+    { label: "Δ7", semitones: 11, letterSteps: 6 }
+];
+
+const ROOTS = [
+    { name: "C", letter: 0, pitch: 0 },
+    { name: "C♯", letter: 0, pitch: 1 },
+    { name: "D♭", letter: 1, pitch: 1 },
+    { name: "D", letter: 1, pitch: 2 },
+    { name: "E♭", letter: 2, pitch: 3 },
+    { name: "E", letter: 2, pitch: 4 },
+    { name: "F", letter: 3, pitch: 5 },
+    { name: "F♯", letter: 3, pitch: 6 },
+    { name: "G♭", letter: 4, pitch: 6 },
+    { name: "G", letter: 4, pitch: 7 },
+    { name: "A♭", letter: 5, pitch: 8 },
+    { name: "A", letter: 5, pitch: 9 },
+    { name: "B♭", letter: 6, pitch: 10 },
+    { name: "B", letter: 6, pitch: 11 }
+];
+
+const TRITONE_MAP = {
+    "C": "F♯", "C♯": "G", "D♭": "G", "D": "A♭", "E♭": "A", "E": "B♭",
+    "F": "B", "F♯": "C", "G♭": "C", "G": "D♭", "A♭": "D", "A": "E♭",
+    "B♭": "E", "B": "F"
+};
+
+const PRACTICAL_NOTE_MAP = {
+    "F♭": "E", "C♭": "B", "E♯": "F", "B♯": "C",
+    "D𝄫": "C", "E𝄫": "D", "G𝄫": "F", "A𝄫": "G", "B𝄫": "A",
+    "C𝄪": "D", "D𝄪": "E", "F𝄪": "G", "G𝄪": "A", "A𝄪": "B"
+};
+
+const LETTERS = ["C", "D", "E", "F", "G", "A", "B"];
+const NATURAL_PITCHES = [0, 2, 4, 5, 7, 9, 11];
+
+let activeIntervals = INTERVAL_MAP.map(i => i.label);
+let timerEnabled = true;
+let currentCard = null;
+let isFlipped = false;
+let startTime = 0;
+let timerInterval = null;
+let totalReviews = 0;
+let totalTime = 0;
+
+function calculateAnswer(root, interval) {
+    if (interval.tritone) return TRITONE_MAP[root.name];
+    let targetPitch = (root.pitch + interval.semitones) % 12;
+    let targetLetterIdx = (root.letter + interval.letterSteps) % 7;
+    let naturalPitch = NATURAL_PITCHES[targetLetterIdx];
+    let diff = (targetPitch - naturalPitch + 12) % 12;
+
+    let accidental = "";
+    if (diff === 1) accidental = "♯";
+    else if (diff === 2) accidental = "𝄪";
+    else if (diff === 11) accidental = "♭";
+    else if (diff === 10) accidental = "𝄫";
+
+    let rawAnswer = LETTERS[targetLetterIdx] + accidental;
+    return PRACTICAL_NOTE_MAP[rawAnswer] || rawAnswer;
+}
+
+function updateStatsUI() {
+    let statsElem = document.getElementById("stats");
+    if (timerEnabled && totalReviews > 0) {
+        let avg = (totalTime / totalReviews).toFixed(2);
+        statsElem.innerText = `Session Reviews: ${totalReviews} | Avg Speed: ${avg}s`;
+    } else {
+        statsElem.innerText = `Session Reviews: ${totalReviews}`;
+    }
+}
+
+function nextCard() {
+    isFlipped = false;
+    document.getElementById("answer").style.display = "none";
+    document.getElementById("flipHint").innerText = "Tap or [Space] to reveal";
+
+    let availableIntervals = INTERVAL_MAP.filter(i => activeIntervals.includes(i.label));
+    if (availableIntervals.length === 0) availableIntervals = INTERVAL_MAP;
+
+    let root = ROOTS[Math.floor(Math.random() * ROOTS.length)];
+    let interval = availableIntervals[Math.floor(Math.random() * availableIntervals.length)];
+    let answer = calculateAnswer(root, interval);
+
+    currentCard = { root, interval, answer };
+
+    document.getElementById("prompt").innerText = `${interval.label} of ${root.name}`;
+    document.getElementById("answer").innerText = answer;
+
+    clearInterval(timerInterval);
+    if (timerEnabled) {
+        document.getElementById("timer").style.display = "block";
+        startTime = Date.now();
+        timerInterval = setInterval(() => {
+            let elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+            document.getElementById("timer").innerText = `${elapsed}s`;
+        }, 30);
+    } else {
+        document.getElementById("timer").style.display = "none";
+    }
+}
+
+function handleCardClick() {
+    if (!isFlipped) {
+        // REVEAL CARD & FREEZE TIMER IMMEDIATELY
+        isFlipped = true;
+        clearInterval(timerInterval);
+        
+        if (timerEnabled) {
+            let finalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+            document.getElementById("timer").innerText = `${finalTime}s`;
+            totalTime += parseFloat(finalTime);
+        }
+
+        totalReviews++;
+        updateStatsUI();
+
+        document.getElementById("answer").style.display = "block";
+        document.getElementById("flipHint").innerText = "Tap or [Space] for NEXT card";
+    } else {
+        // NEXT CARD
+        nextCard();
+    }
+}
+
+function toggleTimerSetting(enabled) {
+    timerEnabled = enabled;
+    document.getElementById("timer").style.display = timerEnabled ? "block" : "none";
+    updateStatsUI();
+}
+
+function initFilters() {
+    let container = document.getElementById("intervalFilters");
+    INTERVAL_MAP.forEach(int => {
+        let label = document.createElement("label");
+        label.innerHTML = `<input type="checkbox" checked value="${int.label}" onchange="updateFilters()"> ${int.label}`;
+        container.appendChild(label);
+    });
+}
+
+function updateFilters() {
+    let checked = Array.from(document.querySelectorAll("#intervalFilters input:checked")).map(c => c.value);
+    activeIntervals = checked;
+}
+
+function toggleModal(show) {
+    let modal = document.getElementById("modal");
+    modal.style.display = show ? "flex" : "none";
+    if (!show && !isFlipped && timerEnabled) {
+        // Reset timer start time after closing modal so menu time isn't counted
+        startTime = Date.now();
+    }
+}
+
+document.addEventListener("keydown", (e) => {
+    if (e.code === "Space" || e.code === "Enter") {
+        e.preventDefault();
+        handleCardClick();
+    }
+});
+
+initFilters();
+nextCard();
+</script>
+</body>
+</html>
